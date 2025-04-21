@@ -18,7 +18,7 @@ class ProgramActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // Кнопка для открытия MP3 плеера
+        // Кнопка для открытия MP3 плеераm
         val btnMp3Player = findViewById<Button>(R.id.btnMp3Player)
         btnMp3Player.setOnClickListener {
             val intent = Intent(this, Mp3Activity::class.java)
