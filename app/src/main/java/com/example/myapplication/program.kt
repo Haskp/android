@@ -1,0 +1,29 @@
+package com.example.myapplication
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+
+
+class ProgramActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_program)
+
+        // Кнопка для открытия калькулятора
+        val btnCalculator = findViewById<Button>(R.id.btnCalculator)
+        btnCalculator.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+        }
+
+        // Кнопка для открытия MP3 плеера
+        val btnMp3Player = findViewById<Button>(R.id.btnMp3Player)
+        btnMp3Player.setOnClickListener {
+            val intent = Intent(this, Mp3Activity::class.java)
+
+            startActivity(intent)
+        }
+    }
+}
