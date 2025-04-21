@@ -11,14 +11,13 @@ class ProgramActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_program)
 
-        // Кнопка для открытия калькулятора
         val btnCalculator = findViewById<Button>(R.id.btnCalculator)
         btnCalculator.setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)
         }
 
-        // Кнопка для открытия MP3 плеераm
+
         val btnMp3Player = findViewById<Button>(R.id.btnMp3Player)
         btnMp3Player.setOnClickListener {
             val intent = Intent(this, Mp3Activity::class.java)
