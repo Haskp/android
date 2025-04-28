@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 
-
 class ProgramActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -17,11 +16,16 @@ class ProgramActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-
         val btnMp3Player = findViewById<Button>(R.id.btnMp3Player)
         btnMp3Player.setOnClickListener {
             val intent = Intent(this, Mp3Activity::class.java)
+            startActivity(intent)
+        }
 
+        // Обработчик для кнопки "Открыть карту"
+        val btnMap = findViewById<Button>(R.id.btnMap)
+        btnMap.setOnClickListener {
+            val intent = Intent(this, GisActivity::class.java)  // Здесь GisActivity - это активити с картой
             startActivity(intent)
         }
     }

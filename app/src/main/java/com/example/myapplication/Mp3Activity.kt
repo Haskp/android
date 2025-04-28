@@ -36,7 +36,7 @@ class Mp3Activity : AppCompatActivity() {
         val id: Long,
         val title: String,
         val artist: String,
-        val duration: Long,//длит.
+        val duration: Long,
         val uri: Uri
     )
 

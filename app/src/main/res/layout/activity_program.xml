@@ -20,4 +20,12 @@
         android:baselineAligned="false"
         android:text="Открыть MP3-плеер" />
 
+    <!-- Кнопка для открытия карты -->
+    <Button
+        android:id="@+id/btnMap"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Открыть карту" />
+
 </LinearLayout>
