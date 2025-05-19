@@ -13,45 +13,74 @@ import com.google.android.gms.location.LocationServices
 
 class GisActivity : AppCompatActivity() {
 
-    private lateinit var loc: FusedLocationProviderClient
+    private lateinit var LocClient: FusedLocationProviderClient
+    private lateinit var TextView: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_gis)
 
-        loc = LocationServices.getFusedLocationProviderClient(this)
+        TextView = findViewById(R.id.gistxt)
+        LocClient = LocationServices.getFusedLocationProviderClient(this)
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
+        cheklocprim()
+    }
+
+    private fun cheklocprim() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
         ) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                REQUEST_LOCATION_PERMISSION
+            )
         } else {
-            getloc()
+            getlocation()
         }
     }
 
-    private fun getloc() {
-        loc.lastLocation.addOnSuccessListener { location ->
-            val gistxt = findViewById<TextView>(R.id.gistxt)
-
-            if (location != null) {
-                val lat = location.latitude
-                val lon = location.longitude
-                gistxt.text = "Текущие координаты: $lat, $lon"
-            } else {
-                gistxt.text = "Не удалось получить координаты"
-            }
+    private fun getlocation() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            LocClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        val lat = location.latitude
+                        val lon = location.longitude
+                        TextView.text = "Широта: $lat\nДолгота: $lon"
+                    } else {
+                        TextView.text = "Местоположение недоступно"
+                    }
+                }
         }
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            getloc()
-        } else {
-            Toast.makeText(this, "Требуется разрешение ", Toast.LENGTH_SHORT).show()
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getlocation()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Разрешение на доступ к местоположению отклонено",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
+    }
+
+    companion object {
+        private const val REQUEST_LOCATION_PERMISSION = 1
     }
 }

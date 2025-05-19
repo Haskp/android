@@ -33,32 +33,31 @@ class MainActivity : AppCompatActivity() {
         val button0: Button = findViewById(R.id.button0)
 
 
-        val buttonAdd: Button = findViewById(R.id.button14) // "+"
-        val buttonSubtract: Button = findViewById(R.id.button15) // "-"
-        val buttonEquals: Button = findViewById(R.id.button13) // "="
-        val buttonClear: Button = findViewById(R.id.button17) // "C"
-        val buttonMultiply: Button = findViewById(R.id.button19) // "*"
-        val buttonDivide: Button = findViewById(R.id.button18) // "/"
+        val buttonAdd: Button = findViewById(R.id.button14)
+        val buttonSubtract: Button = findViewById(R.id.button15)
+        val buttonEquals: Button = findViewById(R.id.button13)
+        val buttonClear: Button = findViewById(R.id.button17)
+        val buttonMultiply: Button = findViewById(R.id.button19)
+        val buttonDivide: Button = findViewById(R.id.button18)
+
+        button1.setOnClickListener { appdNumber("1") }
+        button2.setOnClickListener { appdNumber("2") }
+        button3.setOnClickListener { appdNumber("3") }
+        button4.setOnClickListener { appdNumber("4") }
+        button5.setOnClickListener { appdNumber("5") }
+        button6.setOnClickListener { appdNumber("6") }
+        button7.setOnClickListener { appdNumber("7") }
+        button8.setOnClickListener { appdNumber("8") }
+        button9.setOnClickListener { appdNumber("9") }
+        button0.setOnClickListener { appdNumber("0") }
 
 
-        button1.setOnClickListener { appendNumber("1") }
-        button2.setOnClickListener { appendNumber("2") }
-        button3.setOnClickListener { appendNumber("3") }
-        button4.setOnClickListener { appendNumber("4") }
-        button5.setOnClickListener { appendNumber("5") }
-        button6.setOnClickListener { appendNumber("6") }
-        button7.setOnClickListener { appendNumber("7") }
-        button8.setOnClickListener { appendNumber("8") }
-        button9.setOnClickListener { appendNumber("9") }
-        button0.setOnClickListener { appendNumber("0") }
-
-        //обработчики
         buttonAdd.setOnClickListener { setOperation("+") }
         buttonSubtract.setOnClickListener { setOperation("-") }
         buttonMultiply.setOnClickListener { setOperation("*") }
         buttonDivide.setOnClickListener { setOperation("/") }
 
-        //   "="
+
         buttonEquals.setOnClickListener { calculateResult() }
 
         buttonClear.setOnClickListener { clearInput() }
@@ -71,13 +70,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // добавляем цифры к текущему вводу
-    private fun appendNumber(number: String) {
+    private fun appdNumber(number: String) {
         currentInput += number
         upDisplay()
     }
 
-    // операци (плюс, минус, умножение, деление)
     private fun setOperation(operation: String) {
         if (currentInput.isNotEmpty()) {
             if (previousInput.isEmpty()) {
@@ -89,7 +86,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // отображение
     private fun upDisplay() {
         val displayText = if (lastOperation != null) {
             "$previousInput $lastOperation $currentInput"
@@ -99,7 +95,6 @@ class MainActivity : AppCompatActivity() {
         resultTextView.text = displayText
     }
 
-    //  вычисления
     private fun calculateResult() {
         if (currentInput.isNotEmpty() && previousInput.isNotEmpty() && lastOperation != null) {
             val num1 = previousInput.toDouble()
