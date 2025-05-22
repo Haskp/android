@@ -10,6 +10,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class GisActivity : AppCompatActivity() {
 
@@ -53,7 +56,8 @@ class GisActivity : AppCompatActivity() {
                     if (location != null) {
                         val lat = location.latitude
                         val lon = location.longitude
-                        TextView.text = "Широта: $lat\nДолгота: $lon"
+                        val locTime = time(location.time)
+                        TextView.text = "Время : $locTime\nШирота: $lat\nДолгота: $lon"
                     } else {
                         TextView.text = "Местоположение недоступно"
                     }
@@ -61,6 +65,10 @@ class GisActivity : AppCompatActivity() {
         }
     }
 
+    private fun time(timeInMillis: Long): String {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date(timeInMillis))
+    }
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
