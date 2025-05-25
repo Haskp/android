@@ -10,9 +10,9 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var resText: TextView
-    private var tInput = ""
+    private var tInput = "" // тек.ввод
     private var lOp: String? = null
-    private var pInput = ""
+    private var pInput = "" // пр.ввод
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,9 +58,9 @@ class MainActivity : AppCompatActivity() {
         buttonDivide.setOnClickListener { setOperation("/") }
 
 
-        buttonEquals.setOnClickListener { calculateResult() }
+        buttonEquals.setOnClickListener { Result() }
 
-        buttonClear.setOnClickListener { clearInput() }
+        buttonClear.setOnClickListener { clear() }
 
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
         resText.text = displayText
     }
 
-    private fun calculateResult() {
+    private fun Result() {
         if (tInput.isNotEmpty() && pInput.isNotEmpty() && lOp != null) {
             val num1 = pInput.toDouble()
             val num2 = tInput.toDouble()
@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun clearInput() {
+    private fun clear() {
         tInput = ""
         pInput = ""
         lOp = null
