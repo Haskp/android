@@ -9,16 +9,16 @@ import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var resultTextView: TextView
-    private var currentInput = ""
-    private var lastOperation: String? = null
-    private var previousInput = ""
+    private lateinit var resText: TextView
+    private var tInput = "" // тек.ввод
+    private var lOp: String? = null
+    private var pInput = "" // пр.ввод
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        resultTextView = findViewById(R.id.textView)
+        resText = findViewById(R.id.textView)
 
 
         val button1: Button = findViewById(R.id.button1)
@@ -71,36 +71,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appdNumber(number: String) {
-        currentInput += number
+        tInput += number
         upDisplay()
     }
 
     private fun setOperation(operation: String) {
-        if (currentInput.isNotEmpty()) {
-            if (previousInput.isEmpty()) {
-                previousInput = currentInput
+        if (tInput.isNotEmpty()) {
+            if (pInput.isEmpty()) {
+                pInput = tInput
             }
-            currentInput = ""
-            lastOperation = operation
+            tInput = ""
+            lOp = operation
             upDisplay()
         }
     }
 
     private fun upDisplay() {
-        val displayText = if (lastOperation != null) {
-            "$previousInput $lastOperation $currentInput"
+        val displayText = if (lOp != null) {
+            "$pInput $lOp $tInput"
         } else {
-            currentInput
+            tInput
         }
-        resultTextView.text = displayText
+        resText.text = displayText
     }
 
     private fun calculateResult() {
-        if (currentInput.isNotEmpty() && previousInput.isNotEmpty() && lastOperation != null) {
-            val num1 = previousInput.toDouble()
-            val num2 = currentInput.toDouble()
+        if (tInput.isNotEmpty() && pInput.isNotEmpty() && lOp != null) {
+            val num1 = pInput.toDouble()
+            val num2 = tInput.toDouble()
 
-            val result = when (lastOperation) {
+            val result = when (lOp) {
                 "+" -> num1 + num2
                 "-" -> num1 - num2
                 "*" -> num1 * num2
@@ -115,20 +115,20 @@ class MainActivity : AppCompatActivity() {
             }
 
 
-            resultTextView.text = if (result is String) result else result.toString()
+            resText.text = if (result is String) result else result.toString()
 
 
-            currentInput = ""
-            previousInput = result.toString()
-            lastOperation = null
+            tInput = ""
+            pInput = result.toString()
+            lOp = null
         }
     }
 
 
     private fun clearInput() {
-        currentInput = ""
-        previousInput = ""
-        lastOperation = null
-        resultTextView.text = "0"
+        tInput = ""
+        pInput = ""
+        lOp = null
+        resText.text = "0"
     }
 }

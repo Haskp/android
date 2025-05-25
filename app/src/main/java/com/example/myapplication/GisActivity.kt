@@ -56,7 +56,7 @@ class GisActivity : AppCompatActivity() {
                     if (location != null) {
                         val lat = location.latitude
                         val lon = location.longitude
-                        val locTime = time(location.time)
+                        val locTime = (location.time)
                         TextView.text = "Время : $locTime\nШирота: $lat\nДолгота: $lon"
                     } else {
                         TextView.text = "Местоположение недоступно"
