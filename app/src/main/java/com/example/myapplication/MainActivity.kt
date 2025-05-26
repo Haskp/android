@@ -10,9 +10,9 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var resText: TextView
-    private var tInput = "" // тек.ввод
-    private var lOp: String? = null // посл.опер
-    private var pInput = "" // пр.ввод
+    private var tInput = ""
+    private var lOp: String? = null
+    private var pInput = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
