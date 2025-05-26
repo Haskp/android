@@ -11,7 +11,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var resText: TextView
     private var tInput = "" // тек.ввод
-    private var lOp: String? = null
+    private var lOp: String? = null // посл.опер
     private var pInput = "" // пр.ввод
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
 
         buttonEquals.setOnClickListener { Result() }
 
-        buttonClear.setOnClickListener { clear() }
+        buttonClear.setOnClickListener { clear() } 
 
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
