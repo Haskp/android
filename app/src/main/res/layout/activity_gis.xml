@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/gistxt"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text="Нажмите 'Обновить' для получения координат"
+        android:textSize="16sp"
+        android:padding="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/refreshButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Обновить"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/sendButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Отправить"
+            android:layout_marginEnd="4dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/startBackground"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Запустить фон"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/stopBackground"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Остановить фон"
+            android:layout_marginStart="4dp" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/showRecords"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Показать записи"
+        android:layout_marginTop="8dp" />
+
+    <Button
+        android:id="@+id/sendAllSavedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Отправить все сохраненные данные"
+        android:layout_margin="8dp" />
+
+</LinearLayout>
