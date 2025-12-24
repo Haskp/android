@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
 
         val buttonAdd: Button = findViewById(R.id.button14)
         val buttonSubtract: Button = findViewById(R.id.button15)
-        val buttonEquals: Button = findViewById(R.id.button13)
+        val buttonEquals: Button = findViewById(R.id.button13) //
         val buttonClear: Button = findViewById(R.id.button17)
         val buttonMultiply: Button = findViewById(R.id.button19)
         val buttonDivide: Button = findViewById(R.id.button18)

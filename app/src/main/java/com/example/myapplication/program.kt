@@ -22,10 +22,16 @@ class ProgramActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // Обработчик для кнопки "Открыть карту"
         val btnMap = findViewById<Button>(R.id.btnMap)
         btnMap.setOnClickListener {
-            val intent = Intent(this, GisActivity::class.java)  // Здесь GisActivity - это активити с картой
+            val intent = Intent(this, GisActivity::class.java)
+            startActivity(intent)
+        }
+
+        // Новая кнопка для клиента
+        val btnClient = findViewById<Button>(R.id.btnClient)
+        btnClient.setOnClickListener {
+            val intent = Intent(this, SocketActivity::class.java)
             startActivity(intent)
         }
     }
