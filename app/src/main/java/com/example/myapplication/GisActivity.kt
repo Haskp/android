@@ -28,7 +28,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// data class только с координатами и временем
+// кординаты и время
 data class LocationRecord(
     val latitude: Double,
     val longitude: Double,
