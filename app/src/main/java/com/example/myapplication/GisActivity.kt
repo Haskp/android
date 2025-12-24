@@ -1,8 +1,10 @@
 package com.example.myapplication
+
 import android.Manifest
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.telephony.*
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -19,52 +21,59 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.InetSocketAddress
-import java.net.Socket
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.zeromq.ZMQ
 
-// кординаты и время
 data class LocationRecord(
     val latitude: Double,
     val longitude: Double,
     val timestamp: Long,
-    val time: String
+    val time: String,
+    val gsmInfo: GsmInfo? = null
+)
+
+data class GsmInfo(
+    val mcc: Int,
+    val mnc: Int,
+    val lac: Int,
+    val cid: Int,
+
+    val signalStrength: Int
 )
 
 class GisActivity : AppCompatActivity() {
 
-    private lateinit var lockclient: FusedLocationProviderClient
+    private lateinit var locClient: FusedLocationProviderClient
     private lateinit var textView: TextView
     private lateinit var sendButton: Button
     private lateinit var refresh: Button
-    private lateinit var startBackground: Button
-    private lateinit var stopBackground: Button
-    private lateinit var showRecords: Button
-    private lateinit var sendAllSavedButton: Button
+    private lateinit var startBac: Button
+    private lateinit var stopBac: Button
+    private lateinit var AllSave: Button
+
     private var currentLatitude: Double = 0.0
     private var currentLongitude: Double = 0.0
     private var currentTime: String = ""
 
-    private var backgroundJob: Job? = null
-    private var isBackgroundRunning = false
+    private var bacJob: Job? = null
+    private var BacRun = false
 
-    private val locationRecords = mutableListOf<LocationRecord>()
+    private val locRec = mutableListOf<LocationRecord>()
 
     private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var telephonyManager: TelephonyManager
+
+    private var zmqContext: ZMQ.Context? = null
+    private var zmqSocket: ZMQ.Socket? = null
 
     companion object {
         private const val REQUEST_LOCATION_PERMISSION = 1
         private const val SERVER_IP = "192.168.0.44"
-        private const val SERVER_PORT = 5000
-        private const val SOCKET_TIMEOUT = 5000
-        private const val BACKGROUND_INTERVAL = 5000L
+        private const val SERVER_PORT = 5555
+        private const val BACKGROUND_INTERVAL = 1000L
 
-        //  key save
         private const val PREFS_NAME = "location_prefs"
         private const val RECORDS_KEY = "saved_records"
     }
@@ -74,373 +83,59 @@ class GisActivity : AppCompatActivity() {
         setContentView(R.layout.activity_gis)
 
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
 
         initViews()
-        setupClick()
-        LocPermission()
+        ClickListeners()
+        cheklocprim()
 
-        loadRecordsFromPrefs()
+        loadRec()
+        initZmq()
     }
 
     private fun initViews() {
         textView = findViewById(R.id.gistxt)
         sendButton = findViewById(R.id.sendButton)
         refresh = findViewById(R.id.refreshButton)
-        startBackground = findViewById(R.id.startBackground)
-        stopBackground = findViewById(R.id.stopBackground)
-        showRecords = findViewById(R.id.showRecords)
-        sendAllSavedButton = findViewById(R.id.sendAllSavedButton)
+        startBac = findViewById(R.id.startBackground)
+        stopBac = findViewById(R.id.stopBackground)
+        AllSave = findViewById(R.id.AllSave)
 
-        lockclient = LocationServices.getFusedLocationProviderClient(this)
+        locClient = LocationServices.getFusedLocationProviderClient(this)
 
         sendButton.isEnabled = false
-        stopBackground.isEnabled = false
+        stopBac.isEnabled = false
     }
 
-    private fun setupClick() {
+    private fun ClickListeners() {
         refresh.setOnClickListener {
-            getLoc()
+            getlocation()
         }
 
         sendButton.setOnClickListener {
             if (currentLatitude != 0.0 && currentLongitude != 0.0) {
-                val record = createLocationRecord()
-                saveLocationRecord(record)
+                val record = LocRec()
+                saveLocRec(record)
                 sendServer(record)
             } else {
                 showToast("Сначала получите координаты")
             }
         }
 
-        startBackground.setOnClickListener {
-            startBackgroundSending()
+        startBac.setOnClickListener {
+            BackSending()
+        }
+        stopBac.setOnClickListener {
+            stopSending()
+        }
+        AllSave.setOnClickListener {
+            sendallsavedata()
         }
 
-        stopBackground.setOnClickListener {
-            stopBackgroundSending()
-        }
 
-        showRecords.setOnClickListener {
-            showAllRecords()
-        }
-
-        //Отправка всех сохраненных данных
-        sendAllSavedButton.setOnClickListener {
-            sendAllSavedDataToServer()
-        }
     }
 
-    // отправка всех сохраненных данных на сервер
-    private fun sendAllSavedDataToServer() {
-        if (locationRecords.isEmpty()) {
-            showToast("Нет сохраненных данных для отправки")
-            return
-        }
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                withContext(Dispatchers.Main) {
-                    showToast("Начинаю отправку ${locationRecords.size} записей...")
-                }
-
-                var successCount = 0
-                var errorCount = 0
-
-                // Отправляем каждую запись отдельно
-                locationRecords.forEachIndexed { index, record ->
-                    try {
-                        sendSingleRecordToServer(record)
-                        successCount++
-
-                        // Обновляем прогресс раз во сколько то записей
-                        if (index % 5 == 0) {
-                            withContext(Dispatchers.Main) {
-                                textView.text = "Отправка: $index/${locationRecords.size}"
-                            }
-                        }
-
-                        // зажержка отправки
-                        delay(100)
-
-                    } catch (e: Exception) {
-                        errorCount++
-                        println("Ошибка отправки записи $index: ${e.message}")
-                    }
-                }
-
-                withContext(Dispatchers.Main) {
-                    val message = "Отправка завершена!\nУспешно: $successCount\nОшибок: $errorCount"
-                    showToast(message)
-                    upLocTxt()
-                    println(message)
-                }
-
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showToast("Ошибка массовой отправки: ${e.message}")
-                }
-            }
-        }
-    }
-
-    //   отправка одной записи
-    private suspend fun sendSingleRecordToServer(record: LocationRecord): Boolean {
-        var socket: Socket? = null
-        return try {
-            val jsonData = recordToJson(record)
-            println("Отправка сохраненной записи: $jsonData")
-
-            socket = Socket()
-            val socketAddress = InetSocketAddress(SERVER_IP, SERVER_PORT)
-            socket.soTimeout = SOCKET_TIMEOUT
-            socket.connect(socketAddress, SOCKET_TIMEOUT)
-
-            val outputStream = socket.getOutputStream()
-            val writer = OutputStreamWriter(outputStream, "UTF-8")
-            writer.write(jsonData)
-            writer.flush()
-
-            val inputStream = socket.getInputStream()
-            val reader = BufferedReader(InputStreamReader(inputStream, "UTF-8"))
-            val response = reader.readLine()
-
-            println("Ответ сервера для записи ${record.time}: $response")
-            true
-
-        } catch (e: Exception) {
-            println("Ошибка отправки записи ${record.time}: ${e.message}")
-            false
-        } finally {
-            try {
-                socket?.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    //   отправка всех данных одним пакетом
-    private fun sendAllDataAsBatch() {
-        if (locationRecords.isEmpty()) {
-            showToast("Нет сохраненных данных для отправки")
-            return
-        }
-
-        CoroutineScope(Dispatchers.IO).launch {
-            var socket: Socket? = null
-            try {
-                val jsonArray = JSONArray()
-                locationRecords.forEach { record ->
-                    jsonArray.put(JSONObject().apply {
-                        put("latitude", record.latitude)
-                        put("longitude", record.longitude)
-                        put("time", record.time)
-                        put("timestamp", record.timestamp)
-                    })
-                }
-
-                val batchData = JSONObject().apply {
-                    put("type", "batch")
-                    put("records", jsonArray)
-                    put("count", locationRecords.size)
-                }.toString()
-
-                println("Отправка batch данных: $batchData")
-
-                socket = Socket()
-                val socketAddress = InetSocketAddress(SERVER_IP, SERVER_PORT)
-                socket.soTimeout = 10000 // Увеличиваем таймаут для batch отправки
-                socket.connect(socketAddress, 10000)
-
-                val outputStream = socket.getOutputStream()
-                val writer = OutputStreamWriter(outputStream, "UTF-8")
-                writer.write(batchData)
-                writer.flush()
-
-                val inputStream = socket.getInputStream()
-                val reader = BufferedReader(InputStreamReader(inputStream, "UTF-8"))
-                val response = reader.readLine()
-
-                withContext(Dispatchers.Main) {
-                    showToast("Все данные отправлены!\nОтвет: $response")
-                    println("Ответ сервера на batch: $response")
-                }
-
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showToast("Ошибка batch отправки: ${e.message}")
-                    println("Ошибка batch отправки: ${e.message}")
-                }
-            } finally {
-                try {
-                    socket?.close()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-    }
-
-    private fun startBackgroundSending() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            showToast("Сначала получите разрешение на локацию")
-            return
-        }
-
-        isBackgroundRunning = true
-        startBackground.isEnabled = false
-        stopBackground.isEnabled = true
-
-        backgroundJob = CoroutineScope(Dispatchers.IO).launch {
-            while (isBackgroundRunning) {
-                try {
-                    getFreshLocation()
-
-                    //запись data class
-                    if (currentLatitude != 0.0 && currentLongitude != 0.0) {
-                        val record = createLocationRecord()
-                        saveLocationRecord(record)
-                        sendToServerInBackground(record)
-                    }
-                } catch (e: Exception) {
-                    println("Ошибка в фоновой отправке: ${e.message}")
-                }
-                delay(BACKGROUND_INTERVAL)
-            }
-        }
-
-        showToast("Фоновая запись запущена")
-    }
-
-    private fun stopBackgroundSending() {
-        isBackgroundRunning = false
-        backgroundJob?.cancel()
-        startBackground.isEnabled = true
-        stopBackground.isEnabled = false
-        showToast("Фоновая запись остановлена")
-    }
-
-    private suspend fun getFreshLocation() {
-        try {
-            lockclient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        currentLatitude = location.latitude
-                        currentLongitude = location.longitude
-                        currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                            .format(Date(location.time))
-
-                        runOnUiThread {
-                            upLocTxt()
-                        }
-                    }
-                }
-                .addOnFailureListener { e ->
-                    println("Ошибка получения локации в фоне: ${e.message}")
-                }
-
-            delay(1000)
-
-        } catch (e: Exception) {
-            println("Ошибка получения локации: ${e.message}")
-        }
-    }
-
-    private fun createLocationRecord(): LocationRecord {
-        return LocationRecord(
-            latitude = currentLatitude,
-            longitude = currentLongitude,
-            timestamp = System.currentTimeMillis(),
-            time = currentTime.ifEmpty {
-                SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            }
-        )
-    }
-
-    private fun saveLocationRecord(record: LocationRecord) {
-        // Добавляем в список
-        locationRecords.add(record)
-
-        saveRecordsToPrefs()
-
-        // логи
-        println("=== СОХРАНЕНА ЗАПИСЬ ===")
-        println("Время: ${record.time}")
-        println("Широта: ${record.latitude}")
-        println("Долгота: ${record.longitude}")
-        println("========================")
-
-        updateRecordsStats()
-    }
-
-    private fun saveRecordsToPrefs() {
-        try {
-            val jsonArray = JSONArray()
-
-            locationRecords.forEach { record ->
-                val jsonObject = JSONObject().apply {
-                    put("latitude", record.latitude)
-                    put("longitude", record.longitude)
-                    put("timestamp", record.timestamp)
-                    put("time", record.time)
-                }
-                jsonArray.put(jsonObject)
-            }
-
-            sharedPreferences.edit().putString(RECORDS_KEY, jsonArray.toString()).apply()
-            println("Данные сохранены в SharedPreferences. Записей: ${locationRecords.size}")
-        } catch (e: Exception) {
-            println("Ошибка сохранения в SharedPreferences: ${e.message}")
-        }
-    }
-
-    //  загрузка
-    private fun loadRecordsFromPrefs() {
-        try {
-            val recordsJson = sharedPreferences.getString(RECORDS_KEY, null)
-
-            if (!recordsJson.isNullOrEmpty()) {
-                val jsonArray = JSONArray(recordsJson)
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val record = LocationRecord(
-                        latitude = obj.getDouble("latitude"),
-                        longitude = obj.getDouble("longitude"),
-                        timestamp = obj.getLong("timestamp"),
-                        time = obj.getString("time")
-                    )
-                    locationRecords.add(record)
-                }
-                println("Загружено записей из SharedPreferences: ${locationRecords.size}")
-                updateRecordsStats() // Обновляем статистику после загрузки
-            }
-        } catch (e: Exception) {
-            println("Ошибка загрузки данных: ${e.message}")
-        }
-    }
-
-//clear
-    private fun clearAllRecords() {
-        locationRecords.clear()
-        sharedPreferences.edit().remove(RECORDS_KEY).apply()
-        updateRecordsStats()
-        showToast("Все записи очищены")
-        println("Все записи очищены")
-    }
-
-    private fun updateRecordsStats() {
-        runOnUiThread {
-            val statsText = "Записей: ${locationRecords.size}"
-            println(statsText)
-            upLocTxt()
-        }
-    }
-
-    private fun LocPermission() {
+    private fun cheklocprim() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -452,187 +147,400 @@ class GisActivity : AppCompatActivity() {
                 REQUEST_LOCATION_PERMISSION
             )
         } else {
-            getLoc()
+            getlocation()
         }
     }
 
-    private fun getLoc() {
+    private fun getlocation() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            textView.text = "Получение координат..."
             sendButton.isEnabled = false
 
-            lockclient.lastLocation
+            locClient.lastLocation
                 .addOnSuccessListener { location ->
                     if (location != null) {
                         currentLatitude = location.latitude
                         currentLongitude = location.longitude
-                        currentTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                            .format(Date(location.time))
+                        currentTime = time(location.time)
 
-                        upLocTxt()
+                        updateLocText()
                         sendButton.isEnabled = true
-                        showToast("Координаты получены успешно")
-                    } else {
-                        textView.text = "Местоположение недоступно\nПопробуйте обновить"
-                        sendButton.isEnabled = false
-                        showToast("Не удалось получить местоположение")
+                        showToast("Координаты получены")
                     }
                 }
-                .addOnFailureListener { e ->
-                    textView.text = "Ошибка получения местоположения: ${e.message}"
-                    sendButton.isEnabled = false
-                    showToast("Ошибка получения местоположения")
-                }
         } else {
-            showToast("Нет разрешения на доступ к местоположению")
+            showToast("Ошибка: нет разрешения на доступ к местоположению")
         }
     }
 
-    private fun upLocTxt() {
-        val backgroundStatus = if (isBackgroundRunning) "Фоновая запись активна" else ""
-        // ★★★ ИЗМЕНЕНО: Добавлено "(сохранено)" к количеству записей
-        val recordsCount = "Записей: ${locationRecords.size} (сохранено)"
-        val locationText = """
-            Текущие координаты:
-            Широта: $currentLatitude
-            Долгота: $currentLongitude
-            Время: $currentTime
-            
-            $recordsCount
-            $backgroundStatus
-        """.trimIndent()
-        textView.text = locationText
+    private fun time(timeInMillis: Long): String {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date(timeInMillis))
     }
 
-    private fun sendServer(record: LocationRecord) {
+    // ZMQ
+    private fun initZmq() {
         CoroutineScope(Dispatchers.IO).launch {
-            var socket: Socket? = null
             try {
-                val jsonData = recordToJson(record)
-                println("Отправка данных: $jsonData")
-
-                socket = Socket()
-                val socketAddress = InetSocketAddress(SERVER_IP, SERVER_PORT)
-                socket.soTimeout = SOCKET_TIMEOUT
-                socket.connect(socketAddress, SOCKET_TIMEOUT)
-
-                val outputStream = socket.getOutputStream()
-                val writer = OutputStreamWriter(outputStream, "UTF-8")
-                writer.write(jsonData)
-                writer.flush()
-
-                val inputStream = socket.getInputStream()
-                val reader = BufferedReader(InputStreamReader(inputStream, "UTF-8"))
-                val response = reader.readLine()
-
-                withContext(Dispatchers.Main) {
-                    showToast("Данные отправлены!\nОтвет: $response")
-                    println("Ответ сервера: $response")
-                }
-
+                zmqContext = ZMQ.context(1)
+                zmqSocket = zmqContext?.socket(ZMQ.REQ)
+                zmqSocket?.connect("tcp://$SERVER_IP:$SERVER_PORT")
+                zmqSocket?.setReceiveTimeOut(5000)
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showToast("Ошибка отправки: ${e.message}")
-                    println("Ошибка отправки: ${e.message}")
-                }
-                e.printStackTrace()
-            } finally {
-                try {
-                    socket?.close()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                println("Ошибка инициализации ZMQ: ${e.message}")
             }
         }
     }
 
-    private suspend fun sendToServerInBackground(record: LocationRecord) {
-        var socket: Socket? = null
+    // закрытие ZMQ
+    private fun closeZmq() {
         try {
-            val jsonData = recordToJson(record)
-            println("Фоновая отправка: $jsonData")
-
-            socket = Socket()
-            val socketAddress = InetSocketAddress(SERVER_IP, SERVER_PORT)
-            socket.soTimeout = SOCKET_TIMEOUT
-            socket.connect(socketAddress, SOCKET_TIMEOUT)
-
-            val outputStream = socket.getOutputStream()
-            val writer = OutputStreamWriter(outputStream, "UTF-8")
-            writer.write(jsonData)
-            writer.flush()
-
-            val inputStream = socket.getInputStream()
-            val reader = BufferedReader(InputStreamReader(inputStream, "UTF-8"))
-            val response = reader.readLine()
-
-            println("Фоновый ответ сервера: $response")
-
+            zmqSocket?.close()
+            zmqContext?.term()
         } catch (e: Exception) {
-            println("Ошибка фоновой отправки: ${e.message}")
-        } finally {
-            try {
-                socket?.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            println("Ошибка закрытия ZMQ: ${e.message}")
         }
     }
 
-    private fun recordToJson(record: LocationRecord): String {
-        return JSONObject().apply {
+    private fun GsmInfo(): GsmInfo? {
+        return try {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return null
+            }
+
+            var gsmInfo: GsmInfo? = null
+
+            val cellInfoList = telephonyManager.allCellInfo
+            cellInfoList?.forEach { cellInfo ->
+                when (cellInfo) {
+                    is CellInfoGsm -> {
+                        val cellIdentity = cellInfo.cellIdentity
+                        val signalStrength = signallevel(cellInfo.cellSignalStrength)
+
+                        gsmInfo = GsmInfo(
+                            mcc = cellIdentity.mcc,
+                            mnc = cellIdentity.mnc,
+                            lac = cellIdentity.lac,
+                            cid = cellIdentity.cid,
+
+                            signalStrength = signalStrength
+                        )
+                        return@forEach
+                    }
+                }
+            }
+
+            gsmInfo
+        } catch (e: Exception) {
+            println("Ошибка получения GSM информации: ${e.message}")
+            null
+        }
+    }
+
+    private fun signallevel(cellSignalStrength: CellSignalStrength?): Int {
+        return try {
+            cellSignalStrength?.getDbm() ?: -1
+        } catch (e: Exception) {
+            -1
+        }
+    }
+// запись место положения
+    private fun LocRec(): LocationRecord {
+        val gsmInfo = GsmInfo()
+        return LocationRecord(
+            latitude = currentLatitude,
+            longitude = currentLongitude,
+            timestamp = System.currentTimeMillis(),
+            time = currentTime.ifEmpty {
+                SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            },
+            gsmInfo = gsmInfo
+        )
+    }
+// запись json
+    private fun recordJson(record: LocationRecord): String {
+        val jsonObject = JSONObject().apply {
             put("latitude", record.latitude)
             put("longitude", record.longitude)
             put("time", record.time)
             put("timestamp", record.timestamp)
-        }.toString()
+        }
+
+        record.gsmInfo?.let { gsm ->
+            val gsmJson = JSONObject().apply {
+                put("mcc", gsm.mcc)
+                put("mnc", gsm.mnc)
+                put("lac", gsm.lac)
+                put("cid", gsm.cid)
+                put("signal_strength", gsm.signalStrength)
+            }
+            jsonObject.put("gsm_info", gsmJson)
+        }
+
+        return jsonObject.toString()
     }
 
-    // ★★★ ДОБАВЛЕНО ДЛЯ СОХРАНЕНИЯ: Кнопка очистки в диалоге
-    private fun showAllRecords() {
-        if (locationRecords.isEmpty()) {
-            showToast("Нет записей")
+    private fun updateLocText() {
+        val backgroundStatus = if (BacRun) "Фоновая запись активна" else ""
+        val recordsCount = "Записей: ${locRec.size}"
+
+        val locationText = """
+            Текущие координаты:
+            Время: $currentTime
+            Широта: $currentLatitude
+            Долгота: $currentLongitude
+            
+            $recordsCount
+            $backgroundStatus
+        """.trimIndent()
+
+        textView.text = locationText
+    }
+
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getlocation()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Разрешение на доступ к местоположению отклонено",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun loadRec() {
+        try {
+            val recordsJson = sharedPreferences.getString(RECORDS_KEY, null)
+
+            if (!recordsJson.isNullOrEmpty()) {
+                val jsonArray = JSONArray(recordsJson)
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+
+                    val gsmInfo = if (obj.has("gsmInfo")) {
+                        val gsmObj = obj.getJSONObject("gsmInfo")
+                        GsmInfo(
+                            mcc = gsmObj.optInt("mcc", -1),
+                            mnc = gsmObj.optInt("mnc", -1),
+                            lac = gsmObj.optInt("lac", -1),
+                            cid = gsmObj.optInt("cid", -1),
+                            signalStrength = gsmObj.optInt("signalStrength", -1)
+                        )
+                    } else {
+                        null
+                    }
+
+                    val record = LocationRecord(
+                        latitude = obj.getDouble("latitude"),
+                        longitude = obj.getDouble("longitude"),
+                        timestamp = obj.getLong("timestamp"),
+                        time = obj.getString("time"),
+
+                    )
+                    locRec.add(record)
+                }
+                upRec()
+            }
+        } catch (e: Exception) {
+            println("Ошибка загрузки данных: ${e.message}")
+        }
+    }
+
+    private fun saveRec() {
+        try {
+            val jsonArray = JSONArray()
+
+            locRec.forEach { record ->
+                val jsonObject = JSONObject().apply {
+                    put("latitude", record.latitude)
+                    put("longitude", record.longitude)
+                    put("timestamp", record.timestamp)
+                    put("time", record.time)
+
+                    record.gsmInfo?.let { gsm ->
+                        val gsmJson = JSONObject().apply {
+                            put("mcc", gsm.mcc)
+                            put("mnc", gsm.mnc)
+                            put("lac", gsm.lac)
+                            put("cid", gsm.cid)
+                            put("signalStrength", gsm.signalStrength)
+                        }
+                        put("gsmInfo", gsmJson)
+                    }
+                }
+                jsonArray.put(jsonObject)
+            }
+
+            sharedPreferences.edit().putString(RECORDS_KEY, jsonArray.toString()).apply()
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun upRec() {
+        runOnUiThread {
+            updateLocText()
+        }
+    }
+
+    private fun saveLocRec(record: LocationRecord) {
+        locRec.add(record)
+        saveRec()
+        upRec()
+    }
+
+    private fun BackSending() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            showToast("Сначала получите разрешение на локацию")
             return
         }
 
-        val recordsText = StringBuilder()
-        recordsText.append("=== ВСЕ ЗАПИСИ (${locationRecords.size}) ===\n\n")
+        BacRun = true
+        startBac.isEnabled = false
+        stopBac.isEnabled = true
 
-        locationRecords.takeLast(10).forEachIndexed { index, record ->
-            val actualIndex = locationRecords.size - 10 + index + 1
-            recordsText.append("Запись $actualIndex:\n")
-            recordsText.append("  Время: ${record.time}\n")
-            recordsText.append("  Координаты: ${record.latitude}, ${record.longitude}\n")
-            recordsText.append("  ------------------\n")
+        bacJob = CoroutineScope(Dispatchers.IO).launch {
+            while (BacRun) {
+                try {
+                    getlocation()
+
+                    if (currentLatitude != 0.0 && currentLongitude != 0.0) {
+                        val record = LocRec()
+                        saveLocRec(record)
+                        sendServer(record)
+                    }
+                } catch (e: Exception) {
+                    println("Ошибка в фоновой отправке: ${e.message}")
+                }
+                delay(BACKGROUND_INTERVAL)
+            }
         }
 
-        if (locationRecords.size > 10) {
-            recordsText.append("\n... и еще ${locationRecords.size - 10} записей")
+        showToast("Фоновая запись запущена")
+    }
+
+    private fun stopSending() {
+        BacRun = false
+        bacJob?.cancel()
+        startBac.isEnabled = true
+        stopBac.isEnabled = false
+        showToast("Фоновая запись остановлена")
+    }
+
+    // Отправка ZMQ
+    private fun sendServer(record: LocationRecord) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (zmqSocket == null) {
+                    initZmq()
+                    delay(500)
+                }
+
+                if (zmqSocket == null) {
+                    withContext(Dispatchers.Main) {
+                        showToast("ZMQ не подключен")
+                    }
+                    return@launch
+                }
+
+                val jsonData = recordJson(record)
+
+                val sent = zmqSocket?.send(jsonData)
+                if (sent == true) {
+                    val response = zmqSocket?.recvStr()
+
+                    withContext(Dispatchers.Main) {
+                        if (response != null) {
+                            showToast("Данные отправлены!")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    showToast("Ошибка отправки")
+                }
+            }
+        }
+    }
+
+    private fun sendallsavedata() {
+        if (locRec.isEmpty()) {
+            showToast("Нет сохраненных данных для отправки")
+            return
         }
 
-        // Создаем TextView для прокрутки
-        val textView = TextView(this)
-        textView.text = recordsText.toString()
-        textView.setPadding(50, 20, 50, 20)
-        textView.textSize = 14f
+        CoroutineScope(Dispatchers.IO).launch {
+            withContext(Dispatchers.Main) {
+                showToast(" Отправка ${locRec.size} записей...")
+            }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("История записей")
-            .setView(textView)
-            .setPositiveButton("OK", null)
-            // ★★★ ДОБАВЛЕНО ДЛЯ СОХРАНЕНИЯ: Кнопка очистки
-            .setNeutralButton("Очистить все") { dialog, which ->
-                clearAllRecords()
+            var successCount = 0
+
+            locRec.forEachIndexed { index, record ->
+                try {
+                    if (RecServer(record)) {
+                        successCount++
+                    }
+
+                    if (index % 5 == 0) {
+                        withContext(Dispatchers.Main) {
+                            textView.text = "Отправка: $index/${locRec.size}"
+                        }
+                    }
+
+                    delay(100)
+
+                } catch (e: Exception) {
+                    println("Ошибка отправки записи $index: ${e.message}")
+                }
             }
-            // ★★★ ДОБАВЛЕНО: Кнопка отправки всех данных
-            .setNegativeButton("Отправить все на сервер") { dialog, which ->
-                sendAllSavedDataToServer()
+
+            withContext(Dispatchers.Main) {
+                showToast("Отправка завершена! Успешно: ")
+                updateLocText()
             }
-            .show()
+        }
+    }
+
+    private  fun RecServer(record: LocationRecord): Boolean {
+        return try {
+            if (zmqSocket == null) {
+                return false
+            }
+
+            val jsonData = recordJson(record)
+
+            val sent = zmqSocket?.send(jsonData)
+            if (sent == true) {
+                zmqSocket?.recvStr()
+                true
+            } else {
+                false
+            }
+
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun showToast(message: String) {
@@ -641,25 +549,9 @@ class GisActivity : AppCompatActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when (requestCode) {
-            REQUEST_LOCATION_PERMISSION -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    getLoc()
-                } else {
-                    showToast("Разрешение на доступ к местоположению отклонено")
-                }
-            }
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        stopBackgroundSending()
+        stopSending()
+        closeZmq()
     }
 }

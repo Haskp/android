@@ -28,7 +28,6 @@ class ProgramActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // Новая кнопка для клиента
         val btnClient = findViewById<Button>(R.id.btnClient)
         btnClient.setOnClickListener {
             val intent = Intent(this, SocketActivity::class.java)
