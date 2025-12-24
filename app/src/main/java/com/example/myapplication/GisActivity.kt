@@ -447,7 +447,6 @@ class GisActivity : AppCompatActivity() {
         showToast("Фоновая запись остановлена")
     }
 
-    // Отправка ZMQ
     private fun sendServer(record: LocationRecord) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
