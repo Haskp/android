@@ -1,0 +1,3 @@
+[submodule "server"]
+	path = server
+	url = https://github.com/Haskp/server.git
